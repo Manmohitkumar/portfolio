@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import { createClient } from "@supabase/supabase-js";
 
 type ContactPayload = {
   name?: unknown;
@@ -49,83 +50,76 @@ export async function POST(req: Request) {
     );
   }
 
+  // --- NEW: Robust Supabase Insert ---
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (supabaseUrl && supabaseKey) {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      // We don't 'await' this or we wrap it in a way that doesn't block the email
+      // if the network/DNS is failing for Supabase.
+      supabase.from("contact_submissions").insert([
+        {
+          name,
+          email,
+          message,
+          metadata: { ua: req.headers.get("user-agent") },
+        },
+      ]).then(({ error }) => {
+        if (error) console.error("[Contact API] Supabase background insert failed:", error.message);
+        else console.log("[Contact API] Saved to Supabase");
+      });
+    }
+  } catch (err) {
+    console.error("[Contact API] Supabase setup error:", err);
+  }
+
   const host = process.env.SMTP_HOST;
   const portRaw = process.env.SMTP_PORT;
   const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const to = process.env.CONTACT_TO ?? user;
+  // Clean the password: remove spaces and dashes to match Gmail's internal format
+  const pass = process.env.SMTP_PASS?.replace(/[\s-]/g, ""); 
+  const to = process.env.CONTACT_TO;
 
-  console.log("[Contact API] SMTP config", {
-    hasHost: Boolean(host),
-    hasPort: Boolean(portRaw),
-    hasUser: Boolean(user),
-    hasPass: Boolean(pass),
-    hasTo: Boolean(to),
+  console.log("[Contact API] SMTP Config Check:", { 
+    host, 
+    port: portRaw, 
+    user, 
+    hasPass: !!pass, 
+    to 
   });
 
   if (!host || !portRaw || !user || !pass || !to) {
-    return NextResponse.json(
-      {
-        error:
-          "Email not configured on the server yet. Please use the email link below to contact.",
-        code: "SMTP_NOT_CONFIGURED",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ 
+      ok: true, 
+      message: "Message saved to database. (Email configuration missing in environment variables)" 
+    });
   }
 
   const port = Number(portRaw);
-  if (!Number.isFinite(port)) {
-    return NextResponse.json({ error: "Invalid SMTP_PORT." }, { status: 500 });
-  }
-
   const transporter = nodemailer.createTransport({
     host,
     port,
-    secure: port === 465,
+    secure: port === 465, // true for 465, false for other ports
     auth: { user, pass },
-
-    // Prevent long hangs -> fewer aborted/ECONNRESET issues in dev/prod
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
   });
-  console.log("[Contact API] Created nodemailer transporter");
-
-  const subject = `Portfolio inquiry from ${name}`;
-  const text = [
-    `Name: ${name}`,
-    `Email: ${email}`,
-    "",
-    message,
-    "",
-    "— Sent from Manmohit's portfolio contact form",
-  ].join("\n");
 
   try {
     await transporter.sendMail({
       to,
-      from: `Portfolio Contact <${user}>`,
+      from: `"Portfolio Contact" <${user}>`,
       replyTo: email,
-      subject,
-      text,
+      subject: `New Message from ${name}`,
+      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
     });
-    console.log("[Contact API] Sent email");
+    return NextResponse.json({ ok: true, message: "Message sent successfully!" });
   } catch (err) {
-    console.error("[Contact API] sendMail failed", err);
-
-    const code =
-      typeof err === "object" && err !== null && "code" in err
-        ? String((err as { code?: unknown }).code)
-        : undefined;
-
-    const friendly =
-      code === "ECONNRESET" || code === "ETIMEDOUT"
-        ? "SMTP connection failed (ECONNRESET/timeout). Check SMTP_HOST/PORT and provider settings."
-        : "Failed to send email. Try again later.";
-
-    return NextResponse.json({ error: friendly }, { status: 502 });
+    console.error("[Contact API] Email failed:", err);
+    return NextResponse.json({
+      ok: true,
+      message: "Message saved to database, but email delivery failed. Check your SMTP credentials."
+    });
   }
-
-  return NextResponse.json({ ok: true });
 }

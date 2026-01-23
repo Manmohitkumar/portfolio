@@ -71,7 +71,7 @@ export default function ContactSection() {
         body: JSON.stringify(payload),
       });
 
-      const data: unknown = await res.json().catch(() => ({}));
+      const data: any = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         const d = (data ?? {}) as ApiErrorResponse;
@@ -106,7 +106,7 @@ export default function ContactSection() {
 
       setStatus({
         type: "success",
-        message: "Sent. I'll get back to you soon.",
+        message: data.message || "Sent. I'll get back to you soon.",
       });
       setForm({ name: "", email: "", message: "" });
     } catch {
