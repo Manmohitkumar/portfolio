@@ -48,7 +48,6 @@
         "!**/runtime-backend-dom*",
         "!**/turbopack/dev/runtime/**"
       ],
-      "trace": "verbose",
       "internalConsoleOptions": "neverOpen"
     }
   ],
@@ -56,8 +55,7 @@
     {
       "name": "Next.js: debug full stack",
       "configurations": [
-        "Next.js: debug server-side",
-        "Next.js: debug client-side"
+        "Next.js: debug server-side"
       ],
       "stopAll": true
     }

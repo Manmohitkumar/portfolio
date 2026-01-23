@@ -50,6 +50,15 @@ export async function POST(req: Request) {
     );
   }
 
+  // Sanitize inputs to prevent XSS/injection attacks
+  const sanitizedName = name.replace(/[<>\"']/g, "");
+  const sanitizedMessage = message.replace(/[<>\"']/g, "");
+
+  if (!sanitizedName || !sanitizedMessage) {
+    console.log("[Contact API] Validation failed: potential injection detected");
+    return NextResponse.json({ error: "Invalid input detected." }, { status: 400 });
+  }
+
   // --- NEW: Robust Supabase Insert ---
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -62,10 +71,10 @@ export async function POST(req: Request) {
       // if the network/DNS is failing for Supabase.
       supabase.from("contact_submissions").insert([
         {
-          name,
+          name: sanitizedName,
           email,
-          message,
-          metadata: { ua: req.headers.get("user-agent") },
+          message: sanitizedMessage,
+          metadata: { ua: req.headers.get("user-agent"), ip: req.headers.get("x-forwarded-for") || "unknown" },
         },
       ]).then(({ error }) => {
         if (error) console.error("[Contact API] Supabase background insert failed:", error.message);
@@ -139,12 +148,13 @@ export async function POST(req: Request) {
 
   try {
     const sendTo = to || process.env.CONTACT_TO;
+    const safeFromName = sanitizedName.slice(0, 50);
     const info = await transporter.sendMail({
       to: sendTo,
       from: `"Portfolio Contact" <${user || process.env.SMTP_USER || "no-reply@example.com"}>`,
       replyTo: email,
-      subject: `New Message from ${name}`,
-      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+      subject: `New Message from ${safeFromName}`,
+      text: `Name: ${sanitizedName}\nEmail: ${email}\n\nMessage:\n${sanitizedMessage}`,
     });
 
     // If using Ethereal in dev, return the preview URL so developer can inspect the email.
