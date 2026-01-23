@@ -136,7 +136,7 @@ export default function ContactSection() {
             <a
               href="https://github.com/Manmohitkumar"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="glass-panel rounded-2xl px-4 py-3 text-sm text-white/85 transition hover:border-cyan-300/30"
               aria-label="GitHub"
             >
@@ -146,7 +146,7 @@ export default function ContactSection() {
             <a
               href="https://www.linkedin.com/in/manmohit-kumar/"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="glass-panel rounded-2xl px-4 py-3 text-sm text-white/85 transition hover:border-cyan-300/30"
               aria-label="LinkedIn"
             >
@@ -234,7 +234,7 @@ export default function ContactSection() {
                   <a
                     href={previewUrl}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="mt-2 inline-block text-xs underline text-emerald-100"
                   >
                     Preview sent email (dev)

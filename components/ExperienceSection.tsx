@@ -54,13 +54,33 @@ function TimelineBlock({
 export default function ExperienceSection() {
   const education: TimelineItem[] = [
     {
-      title: "Completed 12th Grade",
-      bullets: ["Strong base in computing + problem solving; building projects alongside studies."],
+      title: "B.Tech in Computer Science",
+      org: "Planned / Ongoing",
+      meta: "Chandigarh University",
+      bullets: [
+        "Focus: AI & Software Development",
+        "Building strong foundations in Computer Science & Software Engineering",
+        "Focus on Data Structures, Algorithms, and problem-solving",
+        "Hands-on experience through projects, hackathons, and internships",
+      ],
     },
     {
-      title: "B.Tech (planned / ongoing)",
-      org: "Computer Science focus",
-      bullets: ["Focus: Computer Science, AI & Software Development."],
+      title: "Senior Secondary (Class 11–12)",
+      org: "PCMB — Physics, Chemistry, Mathematics, Biology",
+      bullets: [
+        "Developed strong analytical and scientific thinking",
+        "Balanced exposure to engineering and life sciences",
+        "Strengthened logical reasoning and quantitative skills",
+      ],
+    },
+    {
+      title: "Secondary (Class 10)",
+      org: "Science Stream",
+      bullets: [
+        "Built a solid academic foundation across core subjects",
+        "Early exposure to logical thinking and technology",
+        "Sparked long-term interest in computer science",
+      ],
     },
   ];
 
