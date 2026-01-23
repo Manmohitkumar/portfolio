@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
     if (supabaseUrl && supabaseKey) {
       const supabase = createClient(supabaseUrl, supabaseKey);
-      
+
       // We don't 'await' this or we wrap it in a way that doesn't block the email
       // if the network/DNS is failing for Supabase.
       supabase.from("contact_submissions").insert([
@@ -80,46 +80,86 @@ export async function POST(req: Request) {
   const portRaw = process.env.SMTP_PORT;
   const user = process.env.SMTP_USER;
   // Clean the password: remove spaces and dashes to match Gmail's internal format
-  const pass = process.env.SMTP_PASS?.replace(/[\s-]/g, ""); 
+  const pass = process.env.SMTP_PASS?.replace(/[\s-]/g, "");
   const to = process.env.CONTACT_TO;
 
-  console.log("[Contact API] SMTP Config Check:", { 
-    host, 
-    port: portRaw, 
-    user, 
-    hasPass: !!pass, 
-    to 
+  console.log("[Contact API] SMTP Config Check:", {
+    host,
+    port: portRaw,
+    user,
+    hasPass: !!pass,
+    to
   });
+  // If SMTP config is missing, in production we should not attempt to send.
+  // In development, create a Nodemailer test account (Ethereal) so local testing works without real creds.
+  let transporter: nodemailer.Transporter | null = null;
 
   if (!host || !portRaw || !user || !pass || !to) {
-    return NextResponse.json({ 
-      ok: true, 
-      message: "Message saved to database. (Email configuration missing in environment variables)" 
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json({
+        ok: true,
+        message: "Message saved to database. (Email configuration missing in environment variables)",
+      });
+    }
+
+    try {
+      console.log("[Contact API] SMTP missing — creating Nodemailer test account for development");
+      const testAccount = await nodemailer.createTestAccount();
+      transporter = nodemailer.createTransport({
+        host: testAccount.smtp.host,
+        port: testAccount.smtp.port,
+        secure: testAccount.smtp.secure,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+      // override `to` to the test account mailbox for inspection
+      // but keep original `to` if provided
+      if (!to) {
+        // Ethereal shows received messages in preview URL; set `to` to testAccount.user
+        // so it appears in the test inbox
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        process.env.CONTACT_TO = testAccount.user;
+      }
+    } catch (err) {
+      console.error("[Contact API] Failed to create test SMTP account:", err);
+      return NextResponse.json({ ok: true, message: "Message saved to database. (Email disabled)" });
+    }
+  } else {
+    const port = Number(portRaw);
+    transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
     });
   }
 
-  const port = Number(portRaw);
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465, // true for 465, false for other ports
-    auth: { user, pass },
-  });
-
   try {
-    await transporter.sendMail({
-      to,
-      from: `"Portfolio Contact" <${user}>`,
+    const sendTo = to || process.env.CONTACT_TO;
+    const info = await transporter.sendMail({
+      to: sendTo,
+      from: `"Portfolio Contact" <${user || process.env.SMTP_USER || "no-reply@example.com"}>`,
       replyTo: email,
       subject: `New Message from ${name}`,
       text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
     });
+
+    // If using Ethereal in dev, return the preview URL so developer can inspect the email.
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    if (previewUrl) {
+      console.log("[Contact API] Preview URL:", previewUrl);
+      return NextResponse.json({ ok: true, message: "Message sent (dev test account)", previewUrl });
+    }
+
     return NextResponse.json({ ok: true, message: "Message sent successfully!" });
   } catch (err) {
     console.error("[Contact API] Email failed:", err);
     return NextResponse.json({
       ok: true,
-      message: "Message saved to database, but email delivery failed. Check your SMTP credentials."
+      message: "Message saved to database, but email delivery failed. Check your SMTP credentials.",
     });
   }
 }

@@ -17,11 +17,11 @@ type Status =
   | { type: "sending" }
   | { type: "success"; message: string }
   | {
-      type: "error";
-      message: string;
-      actionHref?: string;
-      actionLabel?: string;
-    };
+    type: "error";
+    message: string;
+    actionHref?: string;
+    actionLabel?: string;
+  };
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -34,6 +34,7 @@ export default function ContactSection() {
     message: "",
   });
   const [status, setStatus] = useState<Status>({ type: "idle" });
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const errors = useMemo(() => {
     const e: Partial<Record<keyof FormState, string>> = {};
@@ -108,6 +109,7 @@ export default function ContactSection() {
         type: "success",
         message: data.message || "Sent. I'll get back to you soon.",
       });
+      setPreviewUrl(data?.previewUrl ?? null);
       setForm({ name: "", email: "", message: "" });
     } catch {
       setStatus({
@@ -153,11 +155,11 @@ export default function ContactSection() {
             </a>
             <a
               href="mailto:mohitchetiwal291@gmail.com"
-              className="glass-panel rounded-2xl px-4 py-3 text-sm text-white/85 transition hover:border-cyan-300/30"
+              className="glass-panel rounded-2xl px-4 py-3 text-sm text-white/85 transition hover:border-cyan-300/30 overflow-hidden"
               aria-label="Email"
             >
               <div className="text-xs text-white/60">Email</div>
-              <div className="mt-1 font-semibold">mohitchetiwal291@gmail.com</div>
+              <div className="mt-1 font-semibold break-words whitespace-normal">mohitchetiwal291@gmail.com</div>
             </a>
           </div>
         </div>
@@ -227,7 +229,17 @@ export default function ContactSection() {
 
             {status.type === "success" ? (
               <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-100">
-                {status.message}
+                <div>{status.message}</div>
+                {previewUrl ? (
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-block text-xs underline text-emerald-100"
+                  >
+                    Preview sent email (dev)
+                  </a>
+                ) : null}
               </div>
             ) : null}
 

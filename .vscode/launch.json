@@ -24,7 +24,7 @@
       "internalConsoleOptions": "neverOpen"
     },
     {
-      "type": "easycode-browser",
+      "type": "chrome",
       "request": "launch",
       "name": "Next.js: debug client-side",
       "url": "http://localhost:3000",
