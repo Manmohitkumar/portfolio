@@ -6,6 +6,7 @@ const nextConfig = {
 	distDir: 'out',
 	turbopack: {},
 	images: {
+		unoptimized: true,
 		remotePatterns: [
 			{
 				protocol: "https",

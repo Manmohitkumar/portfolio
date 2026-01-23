@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build-and-deploy:
@@ -35,13 +32,12 @@ jobs:
           NEXT_DISABLE_ESLINT: 1
           NEXT_DISABLE_TYPECHECK: 1
 
-      - name: Export static site
-        run: npm run export
-        continue-on-error: true
+      - name: Verify build output
+        run: ls -la out/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./out
+          force_orphan: true
