@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+	basePath: '/portfolio',
+	output: 'export',
+	distDir: 'out',
 	turbopack: {},
 	images: {
 		remotePatterns: [
