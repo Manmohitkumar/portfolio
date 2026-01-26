@@ -190,9 +190,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, message: "Message sent successfully!" });
   } catch (err) {
     console.error("[Contact API] Email failed:", err);
-    return NextResponse.json({
-      ok: true,
-      message: "Message saved to database, but email delivery failed. Check your SMTP credentials.",
-    });
+    return NextResponse.json(
+      { error: "Message saved to database, but email delivery failed. Check your SMTP credentials.", code: "EMAIL_DELIVERY_FAILED" },
+      { status: 502 }
+    );
   }
 }

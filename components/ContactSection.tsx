@@ -8,7 +8,7 @@ type FormState = {
   message: string;
 };
 
-type ApiErrorCode = "SMTP_NOT_CONFIGURED";
+type ApiErrorCode = "SMTP_NOT_CONFIGURED" | "EMAIL_DELIVERY_FAILED";
 
 type ApiErrorResponse = { error?: unknown; code?: unknown };
 
@@ -86,7 +86,10 @@ export default function ContactSection() {
 
         const code = typeof d?.code === "string" ? d.code : undefined;
 
-        if (code === ("SMTP_NOT_CONFIGURED" satisfies ApiErrorCode)) {
+        if (
+          code === ("SMTP_NOT_CONFIGURED" satisfies ApiErrorCode) ||
+          code === ("EMAIL_DELIVERY_FAILED" satisfies ApiErrorCode)
+        ) {
           const subject = `Portfolio inquiry from ${payload.name}`;
           const body = [`Name: ${payload.name}`, `Email: ${payload.email}`, "", payload.message].join(
             "\n"
