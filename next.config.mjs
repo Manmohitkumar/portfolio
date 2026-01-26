@@ -16,9 +16,9 @@ const nextConfig = {
 	typescript: {
 		ignoreBuildErrors: true,
 	},
-	eslint: {
-		ignoreDuringBuilds: true,
-	},
+	// Note: `eslint` config in `next.config.mjs` is no longer supported in
+	// Next.js v16+. To skip ESLint during CI builds, set the env var
+	// `NEXT_DISABLE_ESLINT=1` in the workflow or build environment.
 	allowedDevOrigins: ["*.theopenbuilder.com"],
 };
 
