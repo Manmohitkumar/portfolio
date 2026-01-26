@@ -74,6 +74,8 @@ export default function ContactSection() {
 
       const data: any = await res.json().catch(() => ({}));
 
+      if (!res.ok) console.error("[Contact API Error]", res.status, data);
+
       if (!res.ok) {
         const d = (data ?? {}) as ApiErrorResponse;
 
@@ -111,7 +113,8 @@ export default function ContactSection() {
       });
       setPreviewUrl(data?.previewUrl ?? null);
       setForm({ name: "", email: "", message: "" });
-    } catch {
+    } catch (error) {
+      console.error("[Contact Form] Submission error:", error);
       setStatus({
         type: "error",
         message: "Network error. Please try again in a moment.",

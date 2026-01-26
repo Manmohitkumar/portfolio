@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 import { createClient } from "@supabase/supabase-js";
 
 type ContactPayload = {
@@ -99,16 +100,38 @@ export async function POST(req: Request) {
     hasPass: !!pass,
     to
   });
+
+  // Prefer SendGrid API on serverless platforms when configured.
+  const sendgridKey = process.env.SENDGRID_API_KEY;
+  if (sendgridKey) {
+    try {
+      sgMail.setApiKey(sendgridKey);
+      const sgMsg = {
+        to: process.env.CONTACT_TO || user,
+        from: user || process.env.SMTP_USER || "no-reply@example.com",
+        replyTo: email,
+        subject: `New Message from ${sanitizedName}`,
+        text: `Name: ${sanitizedName}\nEmail: ${email}\n\nMessage:\n${sanitizedMessage}`,
+      };
+      await sgMail.send(sgMsg as any);
+      return NextResponse.json({ ok: true, message: "Message sent via SendGrid." });
+    } catch (err) {
+      console.error("[Contact API] SendGrid send failed:", err);
+      // fall through to SMTP/Ethereal fallback
+    }
+  }
   // If SMTP config is missing, in production we should not attempt to send.
   // In development, create a Nodemailer test account (Ethereal) so local testing works without real creds.
   let transporter: nodemailer.Transporter | null = null;
 
   if (!host || !portRaw || !user || !pass || !to) {
     if (process.env.NODE_ENV === "production") {
-      return NextResponse.json({
-        ok: true,
-        message: "Message saved to database. (Email configuration missing in environment variables)",
-      });
+      // In production, indicate that SMTP isn't configured so the frontend
+      // can present a mailto fallback (actionHref) to the user.
+      return NextResponse.json(
+        { error: "Email delivery is not configured on the server.", code: "SMTP_NOT_CONFIGURED" },
+        { status: 503 }
+      );
     }
 
     try {
