@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
 import { createClient } from "@supabase/supabase-js";
 
@@ -120,79 +119,62 @@ export async function POST(req: Request) {
       // fall through to SMTP/Ethereal fallback
     }
   }
-  // If SMTP config is missing, in production we should not attempt to send.
-  // In development, create a Nodemailer test account (Ethereal) so local testing works without real creds.
-  let transporter: nodemailer.Transporter | null = null;
+  // Prefer EmailJS if configured (service/template/public key)
+  const emailjsService = process.env.EMAILJS_SERVICE_ID;
+  const emailjsTemplate = process.env.EMAILJS_TEMPLATE_ID;
+  const emailjsUser = process.env.EMAILJS_PUBLIC_KEY || process.env.EMAILJS_USER;
 
-  if (!host || !portRaw || !user || !pass || !to) {
+  if (emailjsService && emailjsTemplate && emailjsUser) {
+    try {
+      const payload = {
+        service_id: emailjsService,
+        template_id: emailjsTemplate,
+        user_id: emailjsUser,
+        template_params: {
+          from_name: sanitizedName,
+          from_email: email,
+          message: sanitizedMessage,
+          to_email: to || user || process.env.CONTACT_TO,
+        },
+      };
+
+      const resp = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (resp.ok) {
+        return NextResponse.json({ ok: true, message: "Message sent via EmailJS." });
+      }
+
+      const text = await resp.text();
+      console.error("[Contact API] EmailJS send failed:", resp.status, text);
+      // fall through to error response below
+    } catch (err) {
+      console.error("[Contact API] EmailJS error:", err);
+    }
+  }
+
+  // If no server-side email provider is configured, in production we must
+  // report that email delivery is not available. In development we save and
+  // return success so devs can continue without real credentials.
+  if (!sendgridKey && !(emailjsService && emailjsTemplate && emailjsUser) && (!host || !portRaw || !user || !pass || !to)) {
     if (process.env.NODE_ENV === "production") {
-      // In production, indicate that SMTP isn't configured so the frontend
-      // can present a mailto fallback (actionHref) to the user.
       return NextResponse.json(
         { error: "Email delivery is not configured on the server.", code: "SMTP_NOT_CONFIGURED" },
         { status: 503 }
       );
     }
 
-    try {
-      console.log("[Contact API] SMTP missing — creating Nodemailer test account for development");
-      const testAccount = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransport({
-        host: testAccount.smtp.host,
-        port: testAccount.smtp.port,
-        secure: testAccount.smtp.secure,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-      });
-      // override `to` to the test account mailbox for inspection
-      // but keep original `to` if provided
-      if (!to) {
-        // Ethereal shows received messages in preview URL; set `to` to testAccount.user
-        // so it appears in the test inbox
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        process.env.CONTACT_TO = testAccount.user;
-      }
-    } catch (err) {
-      console.error("[Contact API] Failed to create test SMTP account:", err);
-      return NextResponse.json({ ok: true, message: "Message saved to database. (Email disabled)" });
-    }
-  } else {
-    const port = Number(portRaw);
-    transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
+    console.log("[Contact API] No email provider configured; running in dev mode — email skipped.");
+    return NextResponse.json({ ok: true, message: "Message saved to database. (Email disabled in this environment)" });
   }
 
-  try {
-    const sendTo = to || process.env.CONTACT_TO;
-    const safeFromName = sanitizedName.slice(0, 50);
-    const info = await transporter.sendMail({
-      to: sendTo,
-      from: `"Portfolio Contact" <${user || process.env.SMTP_USER || "no-reply@example.com"}>`,
-      replyTo: email,
-      subject: `New Message from ${safeFromName}`,
-      text: `Name: ${sanitizedName}\nEmail: ${email}\n\nMessage:\n${sanitizedMessage}`,
-    });
-
-    // If using Ethereal in dev, return the preview URL so developer can inspect the email.
-    const previewUrl = nodemailer.getTestMessageUrl(info);
-    if (previewUrl) {
-      console.log("[Contact API] Preview URL:", previewUrl);
-      return NextResponse.json({ ok: true, message: "Message sent (dev test account)", previewUrl });
-    }
-
-    return NextResponse.json({ ok: true, message: "Message sent successfully!" });
-  } catch (err) {
-    console.error("[Contact API] Email failed:", err);
-    return NextResponse.json(
-      { error: "Message saved to database, but email delivery failed. Check your SMTP credentials.", code: "EMAIL_DELIVERY_FAILED" },
-      { status: 502 }
-    );
-  }
+  // If we reach here, one of the providers failed to send (SendGrid or EmailJS)
+  console.error("[Contact API] Email delivery attempted but failed for all providers.");
+  return NextResponse.json(
+    { error: "Message saved to database, but email delivery failed.", code: "EMAIL_DELIVERY_FAILED" },
+    { status: 502 }
+  );
 }

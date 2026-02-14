@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const nodemailer = require('nodemailer');
 
 function loadEnvFile(filePath) {
     try {
@@ -25,43 +24,47 @@ function loadEnvFile(filePath) {
 
 async function main() {
     const env = loadEnvFile(path.resolve(__dirname, '..', '.env.local'));
-    const host = env.SMTP_HOST || 'smtp.gmail.com';
-    const port = Number(env.SMTP_PORT || 587);
-    const user = env.SMTP_USER;
-    const pass = (env.SMTP_PASS || '').replace(/[\s-]/g, '');
-    const to = env.CONTACT_TO || user;
+    // Prefer EmailJS when configured
+    const emailjsService = env.EMAILJS_SERVICE_ID;
+    const emailjsTemplate = env.EMAILJS_TEMPLATE_ID;
+    const emailjsUser = env.EMAILJS_PUBLIC_KEY || env.EMAILJS_USER;
 
-    if (!user || !pass) {
-        console.error('SMTP_USER or SMTP_PASS missing in .env.local');
-        process.exitCode = 2;
+    if (emailjsService && emailjsTemplate && emailjsUser) {
+        const payload = {
+            service_id: emailjsService,
+            template_id: emailjsTemplate,
+            user_id: emailjsUser,
+            template_params: {
+                from_name: 'Local Test',
+                from_email: env.TEST_FROM_EMAIL || env.SMTP_USER || 'no-reply@example.com',
+                message: 'This is a test message sent via EmailJS REST API',
+                to_email: env.CONTACT_TO || env.SMTP_USER || 'you@example.com',
+            },
+        };
+
+        try {
+            const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (res.ok) {
+                console.log('EmailJS send OK');
+            } else {
+                const txt = await res.text();
+                console.error('EmailJS send failed:', res.status, txt);
+                process.exitCode = 3;
+            }
+        } catch (err) {
+            console.error('EmailJS request failed:', err && err.message ? err.message : err);
+            process.exitCode = 3;
+        }
+
         return;
     }
 
-    console.log('Using SMTP:', { host, port, user, to });
-
-    const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        auth: { user, pass },
-    });
-
-    try {
-        const info = await transporter.sendMail({
-            from: `"Portfolio Test" <${user}>`,
-            to,
-            subject: 'Portfolio – SMTP test',
-            text: 'This is a test message sent by the local SMTP test script.',
-        });
-        console.log('Message sent:', info.messageId || info.response);
-        if (nodemailer.getTestMessageUrl) {
-            const url = nodemailer.getTestMessageUrl(info);
-            if (url) console.log('Preview URL:', url);
-        }
-    } catch (err) {
-        console.error('Send failed:', err && err.message ? err.message : err);
-        process.exitCode = 3;
-    }
+    console.error('EmailJS configuration missing in .env.local (EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY)');
+    process.exitCode = 2;
 }
 
 main();
