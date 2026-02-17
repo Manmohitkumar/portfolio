@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import emailjs from "@emailjs/browser";
 
 type FormState = {
@@ -26,8 +25,7 @@ function isValidEmail(email: string): boolean {
 }
 
 export default function ContactSection() {
-  const searchParams = useSearchParams();
-  const debugEnabled = searchParams?.get("debug") === "1";
+  const [debugEnabled, setDebugEnabled] = useState(false);
   const [form, setForm] = useState<FormState>({
     name: "",
     email: "",
@@ -44,6 +42,12 @@ export default function ContactSection() {
     }),
     []
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setDebugEnabled(params.get("debug") === "1");
+  }, []);
 
   const errors = useMemo(() => {
     const e: Partial<Record<keyof FormState, string>> = {};
