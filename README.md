@@ -6,8 +6,7 @@ A modern, responsive portfolio website built with Next.js 15, React 19, and Type
 
 - **Modern Design**: Clean, glassmorphic UI with smooth animations
 - **Responsive**: Fully responsive across all devices
-- **Contact Form**: Integrated with Supabase and email notifications (Gmail SMTP)
-- **Email Previews**: Development mode with Ethereal test email preview
+- **Contact Form**: Email delivery via EmailJS
 - **Type-Safe**: Built with TypeScript for reliability
 - **Performance**: Optimized with Next.js 15 Turbopack and server components
 
@@ -34,11 +33,9 @@ Create a `.env.local` file in the root directory:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_app_password
-CONTACT_TO=your_email@gmail.com
+NEXT_PUBLIC_EMAILJS_SERVICE_ID=your_emailjs_service_id
+NEXT_PUBLIC_EMAILJS_TEMPLATE_ID=your_emailjs_template_id
+NEXT_PUBLIC_EMAILJS_PUBLIC_KEY=your_emailjs_public_key
 ```
 
 ### Build & Deploy
@@ -56,8 +53,7 @@ For production deployment, configure your SMTP and Supabase credentials in your 
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **Database**: Supabase
-- **Email**: Nodemailer with Gmail SMTP
-- **Development**: Dev tool for testing emails with Ethereal
+- **Email**: EmailJS (client-side)
 
 ## License
 

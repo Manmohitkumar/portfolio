@@ -1,16 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import emailjs from "@emailjs/browser";
 
 type FormState = {
   name: string;
   email: string;
   message: string;
 };
-
-type ApiErrorCode = "SMTP_NOT_CONFIGURED" | "EMAIL_DELIVERY_FAILED";
-
-type ApiErrorResponse = { error?: unknown; code?: unknown };
 
 type Status =
   | { type: "idle" }
@@ -34,7 +31,6 @@ export default function ContactSection() {
     message: "",
   });
   const [status, setStatus] = useState<Status>({ type: "idle" });
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const errors = useMemo(() => {
     const e: Partial<Record<keyof FormState, string>> = {};
@@ -49,6 +45,14 @@ export default function ContactSection() {
 
   const canSubmit =
     status.type !== "sending" && Object.keys(errors).length === 0;
+
+  function buildMailto(payload: FormState) {
+    const subject = `Portfolio inquiry from ${payload.name}`;
+    const body = [`Name: ${payload.name}`, `Email: ${payload.email}`, "", payload.message].join("\n");
+    return `mailto:mohitchetiwal291@gmail.com?subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -66,61 +70,44 @@ export default function ContactSection() {
         message: form.message.trim(),
       };
 
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID || "";
+      const templateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID || "";
+      const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY || "";
 
-      const data: any = await res.json().catch(() => ({}));
-
-      if (!res.ok) console.error("[Contact API Error]", res.status, data);
-
-      if (!res.ok) {
-        const d = (data ?? {}) as ApiErrorResponse;
-
-        const msg =
-          typeof d?.error === "string"
-            ? d.error
-            : "Something went wrong. Please try again.";
-
-        const code = typeof d?.code === "string" ? d.code : undefined;
-
-        if (
-          code === ("SMTP_NOT_CONFIGURED" satisfies ApiErrorCode) ||
-          code === ("EMAIL_DELIVERY_FAILED" satisfies ApiErrorCode)
-        ) {
-          const subject = `Portfolio inquiry from ${payload.name}`;
-          const body = [`Name: ${payload.name}`, `Email: ${payload.email}`, "", payload.message].join(
-            "\n"
-          );
-
-          setStatus({
-            type: "error",
-            message: msg,
-            actionHref: `mailto:mohitchetiwal291@gmail.com?subject=${encodeURIComponent(
-              subject
-            )}&body=${encodeURIComponent(body)}`,
-            actionLabel: "Email me instead",
-          });
-          return;
-        }
-
-        setStatus({ type: "error", message: msg });
+      if (!serviceId || !templateId || !publicKey) {
+        setStatus({
+          type: "error",
+          message: "Email service is not configured.",
+          actionHref: buildMailto(payload),
+          actionLabel: "Email me instead",
+        });
         return;
       }
 
+      await emailjs.send(
+        serviceId,
+        templateId,
+        {
+          from_name: payload.name,
+          from_email: payload.email,
+          reply_to: payload.email,
+          message: payload.message,
+        },
+        { publicKey }
+      );
+
       setStatus({
         type: "success",
-        message: data.message || "Sent. I'll get back to you soon.",
+        message: "Sent. I'll get back to you soon.",
       });
-      setPreviewUrl(data?.previewUrl ?? null);
       setForm({ name: "", email: "", message: "" });
     } catch (error) {
       console.error("[Contact Form] Submission error:", error);
       setStatus({
         type: "error",
-        message: "Network error. Please try again in a moment.",
+        message: "Email failed. Please try again in a moment.",
+        actionHref: buildMailto(form),
+        actionLabel: "Email me instead",
       });
     }
   }
@@ -236,16 +223,6 @@ export default function ContactSection() {
             {status.type === "success" ? (
               <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-100">
                 <div>{status.message}</div>
-                {previewUrl ? (
-                  <a
-                    href={previewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-block text-xs underline text-emerald-100"
-                  >
-                    Preview sent email (dev)
-                  </a>
-                ) : null}
               </div>
             ) : null}
 
@@ -265,7 +242,7 @@ export default function ContactSection() {
             ) : null}
 
             <p className="text-xs text-white/50">
-              Tip: Set SMTP env vars to enable email sending (see API route).
+              Tip: Set EmailJS env vars to enable email sending.
             </p>
           </form>
         </div>

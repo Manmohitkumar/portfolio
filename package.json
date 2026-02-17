@@ -13,6 +13,7 @@
     "check-all": "npm run lint & npm run type-check & wait"
   },
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
     "@sendgrid/mail": "^8.1.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.91.1",
