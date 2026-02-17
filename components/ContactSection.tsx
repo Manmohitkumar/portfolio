@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import emailjs from "@emailjs/browser";
 
 type FormState = {
@@ -25,12 +26,24 @@ function isValidEmail(email: string): boolean {
 }
 
 export default function ContactSection() {
+  const searchParams = useSearchParams();
+  const debugEnabled = searchParams?.get("debug") === "1";
   const [form, setForm] = useState<FormState>({
     name: "",
     email: "",
     message: "",
   });
   const [status, setStatus] = useState<Status>({ type: "idle" });
+  const [debugMessage, setDebugMessage] = useState<string | null>(null);
+
+  const emailJsConfig = useMemo(
+    () => ({
+      serviceId: process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID || "",
+      templateId: process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID || "",
+      publicKey: process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY || "",
+    }),
+    []
+  );
 
   const errors = useMemo(() => {
     const e: Partial<Record<keyof FormState, string>> = {};
@@ -45,6 +58,11 @@ export default function ContactSection() {
 
   const canSubmit =
     status.type !== "sending" && Object.keys(errors).length === 0;
+
+  const hasEmailJsConfig =
+    !!emailJsConfig.serviceId &&
+    !!emailJsConfig.templateId &&
+    !!emailJsConfig.publicKey;
 
   function buildMailto(payload: FormState) {
     const subject = `Portfolio inquiry from ${payload.name}`;
@@ -70,30 +88,27 @@ export default function ContactSection() {
         message: form.message.trim(),
       };
 
-      const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID || "";
-      const templateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID || "";
-      const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY || "";
-
-      if (!serviceId || !templateId || !publicKey) {
+      if (!hasEmailJsConfig) {
         setStatus({
           type: "error",
           message: "Email service is not configured.",
           actionHref: buildMailto(payload),
           actionLabel: "Email me instead",
         });
+        setDebugMessage("Missing EmailJS env vars on client build.");
         return;
       }
 
       await emailjs.send(
-        serviceId,
-        templateId,
+        emailJsConfig.serviceId,
+        emailJsConfig.templateId,
         {
           from_name: payload.name,
           from_email: payload.email,
           reply_to: payload.email,
           message: payload.message,
         },
-        { publicKey }
+        { publicKey: emailJsConfig.publicKey }
       );
 
       setStatus({
@@ -103,6 +118,8 @@ export default function ContactSection() {
       setForm({ name: "", email: "", message: "" });
     } catch (error) {
       console.error("[Contact Form] Submission error:", error);
+      const err = error as { text?: string; message?: string } | null;
+      setDebugMessage(err?.text || err?.message || "EmailJS send failed.");
       setStatus({
         type: "error",
         message: "Email failed. Please try again in a moment.",
@@ -238,6 +255,16 @@ export default function ContactSection() {
                     {status.actionLabel} {"->"}
                   </a>
                 ) : null}
+              </div>
+            ) : null}
+
+            {debugEnabled ? (
+              <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-xs text-white/70">
+                <div>EmailJS config:</div>
+                <div>serviceId: {emailJsConfig.serviceId ? "yes" : "no"}</div>
+                <div>templateId: {emailJsConfig.templateId ? "yes" : "no"}</div>
+                <div>publicKey: {emailJsConfig.publicKey ? "yes" : "no"}</div>
+                {debugMessage ? <div className="mt-2">Last error: {debugMessage}</div> : null}
               </div>
             ) : null}
 
