@@ -14,7 +14,6 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   let body: ContactPayload = {};
@@ -52,14 +51,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid input detected." }, { status: 400 });
   }
 
-  // EmailJS credentials
-  const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID;
-  const templateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID;
-  const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY;
+  // EmailJS server-side credentials
+  const serviceId = process.env.EMAILJS_SERVICE_ID;
+  const templateId = process.env.EMAILJS_TEMPLATE_ID;
+  const privateKey = process.env.EMAILJS_PRIVATE_KEY;
   const contactTo = process.env.CONTACT_TO;
 
-  if (!serviceId || !templateId || !publicKey || !contactTo) {
-    console.error("[Contact API] Missing EmailJS config");
+  if (!serviceId || !templateId || !privateKey || !contactTo) {
+    console.error("[Contact API] Missing EmailJS server config");
     return NextResponse.json(
       { error: "Email service is not configured on the server." },
       { status: 500 }
@@ -71,13 +70,14 @@ export async function POST(req: Request) {
     const payload = {
       service_id: serviceId,
       template_id: templateId,
-      user_id: publicKey,
+      user_id: privateKey,
       template_params: {
         from_name: sanitizedName,
         from_email: email,
         message: sanitizedMessage,
         to_email: contactTo,
       },
+      accessToken: privateKey,
     };
 
     const resp = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
