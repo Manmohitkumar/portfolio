@@ -103,6 +103,11 @@ export default function ContactSection() {
         return;
       }
 
+      console.log("[Contact] Sending via EmailJS with config:", {
+        service: emailJsConfig.serviceId,
+        template: emailJsConfig.templateId,
+      });
+
       await emailjs.send(
         emailJsConfig.serviceId,
         emailJsConfig.templateId,
@@ -115,15 +120,19 @@ export default function ContactSection() {
         { publicKey: emailJsConfig.publicKey }
       );
 
+      console.log("[Contact] EmailJS sent successfully");
+
       setStatus({
         type: "success",
         message: "Sent. I'll get back to you soon.",
       });
       setForm({ name: "", email: "", message: "" });
     } catch (error) {
-      console.error("[Contact Form] Submission error:", error);
-      const err = error as { text?: string; message?: string } | null;
-      setDebugMessage(err?.text || err?.message || "EmailJS send failed.");
+      console.error("[Contact Form] EmailJS error:", error);
+      const err = error as any;
+      const errorMsg = err?.text || err?.message || JSON.stringify(err) || "EmailJS send failed.";
+      console.error("[Contact Form] Full error details:", errorMsg);
+      setDebugMessage(errorMsg);
       setStatus({
         type: "error",
         message: "Email failed. Please try again in a moment.",
