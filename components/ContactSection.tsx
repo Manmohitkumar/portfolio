@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import emailjs from "@emailjs/browser";
 
 type FormState = {
   name: string;
   email: string;
   message: string;
 };
+
+type ApiErrorResponse = { error?: unknown; code?: unknown };
 
 type Status =
   | { type: "idle" }
@@ -80,7 +81,6 @@ export default function ContactSection() {
     e.preventDefault();
     if (!canSubmit) {
       setStatus({ type: "error", message: "Please fix the form errors." });
-      console.log("[Contact Form] Validation errors", errors);
       return;
     }
 
@@ -92,50 +92,39 @@ export default function ContactSection() {
         message: form.message.trim(),
       };
 
-      if (!hasEmailJsConfig) {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as any;
+
+      if (!res.ok) {
+        const msg =
+          typeof data?.error === "string"
+            ? data.error
+            : "Something went wrong. Please try again.";
+
         setStatus({
           type: "error",
-          message: "Email service is not configured.",
+          message: msg,
           actionHref: buildMailto(payload),
           actionLabel: "Email me instead",
         });
-        setDebugMessage("Missing EmailJS env vars on client build.");
         return;
       }
 
-      console.log("[Contact] Sending via EmailJS with config:", {
-        service: emailJsConfig.serviceId,
-        template: emailJsConfig.templateId,
-      });
-
-      await emailjs.send(
-        emailJsConfig.serviceId,
-        emailJsConfig.templateId,
-        {
-          from_name: payload.name,
-          from_email: payload.email,
-          reply_to: payload.email,
-          message: payload.message,
-        },
-        { publicKey: emailJsConfig.publicKey }
-      );
-
-      console.log("[Contact] EmailJS sent successfully");
-
       setStatus({
         type: "success",
-        message: "Sent. I'll get back to you soon.",
+        message: data.message || "Sent. I'll get back to you soon.",
       });
       setForm({ name: "", email: "", message: "" });
     } catch (error) {
-      console.error("[Contact Form] EmailJS error:", error);
-      const err = error as any;
-      const errorMsg = err?.text || err?.message || JSON.stringify(err) || "EmailJS send failed.";
-      console.error("[Contact Form] Full error details:", errorMsg);
-      setDebugMessage(errorMsg);
+      console.error("[Contact Form] Error:", error);
       setStatus({
         type: "error",
-        message: "Email failed. Please try again in a moment.",
+        message: "Network error. Please try again.",
         actionHref: buildMailto(form),
         actionLabel: "Email me instead",
       });
@@ -271,19 +260,7 @@ export default function ContactSection() {
               </div>
             ) : null}
 
-            {debugEnabled ? (
-              <div className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-xs text-white/70">
-                <div>EmailJS config:</div>
-                <div>serviceId: {emailJsConfig.serviceId ? "yes" : "no"}</div>
-                <div>templateId: {emailJsConfig.templateId ? "yes" : "no"}</div>
-                <div>publicKey: {emailJsConfig.publicKey ? "yes" : "no"}</div>
-                {debugMessage ? <div className="mt-2">Last error: {debugMessage}</div> : null}
-              </div>
-            ) : null}
-
-            <p className="text-xs text-white/50">
-              Tip: Set EmailJS env vars to enable email sending.
-            </p>
+            <p className="text-xs text-white/50">Sending emails via server.</p>
           </form>
         </div>
       </div>
